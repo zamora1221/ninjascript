@@ -1,0 +1,66 @@
+#region Using declarations
+using System;
+using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.Strategies;
+#endregion
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+    public class DynamicReferencePriceStrategy : Strategy
+    {
+        protected override void OnStateChange()
+        {
+            if (State == State.SetDefaults)
+            {
+                Description = @"Trades based on the percentage change from the latest closing price.";
+                Name = "DynamicReferencePriceStrategy";
+                Calculate = Calculate.OnBarClose; // This ensures the strategy evaluates at the close of each bar
+                EntriesPerDirection = 1;
+                IsExitOnSessionCloseStrategy = true;
+                ExitOnSessionCloseSeconds = 30;
+                IsFillLimitOnTouch = false;
+                MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
+                OrderFillResolution = OrderFillResolution.Standard;
+                Slippage = 2;
+                StartBehavior = StartBehavior.WaitUntilFlat;
+                TimeInForce = TimeInForce.Gtc;
+                TraceOrders = false;
+                RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
+                StopTargetHandling = StopTargetHandling.PerEntryExecution;
+                BarsRequiredToTrade = 20;
+            }
+        }
+
+        protected override void OnBarUpdate()
+{
+    if (CurrentBars[0] < 1) return; // Ensure we have at least one previous bar to analyze
+
+    // Calculate the percentage change from open to close of the previous candle
+    double percentageChangeFromOpenToClose = ((Close[1] - Open[1]) / Open[1]) * 100;
+
+    // Calculate the candle's size for profit target and stop loss settings
+    double candleSize = Math.Abs(Close[1] - Open[1]);
+    double profitTargetTicks = (candleSize / TickSize) * 0.5; // 50% of the candle size in ticks
+    double stopLossTicks = (candleSize / TickSize) * 2; // 200% of the candle size in ticks
+	
+	Print("Percentage Change from Open to Close: " + percentageChangeFromOpenToClose + "% at " + Time[1]);
+    // Entry condition for going LONG
+    if (percentageChangeFromOpenToClose <= -0.35 && percentageChangeFromOpenToClose >= -0.5)
+    {	
+		Print("Long Entry Condition met at " + Time[0]);
+        EnterLong(); // Enter long at the open of the next candle
+        SetProfitTarget(CalculationMode.Ticks, profitTargetTicks);
+        SetStopLoss(CalculationMode.Ticks, stopLossTicks);
+    }
+    // Entry condition for going SHORT
+    else if (percentageChangeFromOpenToClose >= 0.35 && percentageChangeFromOpenToClose <= 0.5)
+    {
+		Print("Short Entry Condition met at " + Time[0]);
+        EnterShort(); // Enter short at the open of the next candle
+        SetProfitTarget(CalculationMode.Ticks, profitTargetTicks);
+        SetStopLoss(CalculationMode.Ticks, stopLossTicks);
+    }
+}
+
+    }
+}
