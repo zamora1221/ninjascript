@@ -33,34 +33,45 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
 {
-    if (CurrentBars[0] < 1) return; // Ensure we have at least one previous bar to analyze
+    // Ensure we have at least two bars to compare
+    if (CurrentBars[0] < 1) return;
 
-    // Calculate the percentage change from open to close of the previous candle
-    double percentageChangeFromOpenToClose = ((Close[1] - Open[1]) / Open[1]) * 100;
+    // Convert the bar's end time to Eastern Time
+    // Note: NinjaTrader server time is typically in Eastern Time; adjust if your server uses a different timezone
+    DateTime estTime = TimeZoneInfo.ConvertTime(Time[0], TimeZoneInfo.Local, TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
 
-    // Calculate the candle's size for profit target and stop loss settings
-    double candleSize = Math.Abs(Close[1] - Open[1]);
-    double profitTargetTicks = (candleSize / TickSize) * 0.5; // 50% of the candle size in ticks
-    double stopLossTicks = (candleSize / TickSize) * 2; // 200% of the candle size in ticks
-	
-	Print("Percentage Change from Open to Close: " + percentageChangeFromOpenToClose + "% at " + Time[1]);
-    // Entry condition for going LONG
-    if (percentageChangeFromOpenToClose <= -0.35 && percentageChangeFromOpenToClose >= -0.5)
-    {	
-		Print("Long Entry Condition met at " + Time[0]);
-        EnterLong(); // Enter long at the open of the next candle
-        SetProfitTarget(CalculationMode.Ticks, profitTargetTicks);
-        SetStopLoss(CalculationMode.Ticks, stopLossTicks);
-    }
-    // Entry condition for going SHORT
-    else if (percentageChangeFromOpenToClose >= 0.35 && percentageChangeFromOpenToClose <= 0.5)
+    // Define the no-trade period start and end times
+    TimeSpan noTradeStart = new TimeSpan(15, 0, 0); // 3:00 PM EST
+    TimeSpan noTradeEnd = new TimeSpan(17, 0, 0); // 5:00 PM EST
+
+
+    // Check if current bar's time is within the no-trade period
+    if (estTime.TimeOfDay >= noTradeStart && estTime.TimeOfDay <= noTradeEnd)
     {
-		Print("Short Entry Condition met at " + Time[0]);
-        EnterShort(); // Enter short at the open of the next candle
-        SetProfitTarget(CalculationMode.Ticks, profitTargetTicks);
-        SetStopLoss(CalculationMode.Ticks, stopLossTicks);
+        return; // Skip this bar because it falls within the no-trade period
+    }
+
+    // Calculate percentage change from open to close of the previous candle
+    double percentageChange = ((Close[1] - Open[1]) / Open[1]) * 100;
+
+    // Determine candle size for setting profit target and stop loss
+    double candleSize = Math.Abs(Close[1] - Open[1]);
+    double profitTargetTicks = candleSize / TickSize * 0.5; // 50% of candle size
+    double stopLossTicks = candleSize / TickSize * 2; // 200% of candle size
+
+    // Conditions to enter trade
+    if (percentageChange <= -0.35 && percentageChange >= -0.5)
+    {
+        EnterLong(1, "LongEntry");
+        SetProfitTarget("LongEntry", CalculationMode.Ticks, profitTargetTicks);
+        SetStopLoss("LongEntry", CalculationMode.Ticks, stopLossTicks, false);
+    }
+    else if (percentageChange >= 0.35 && percentageChange <= 0.5)
+    {
+        EnterShort(1, "ShortEntry");
+        SetProfitTarget("ShortEntry", CalculationMode.Ticks, profitTargetTicks);
+        SetStopLoss("ShortEntry", CalculationMode.Ticks, stopLossTicks, false);
     }
 }
-
-    }
+	}
 }
